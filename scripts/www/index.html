@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📚 学生作业计时器</title>
+    <style>
+        :root {
+            --bg: #f0f4f8;
+            --card-bg: #ffffff;
+            --primary: #4a6cf7;
+            --primary-dark: #3651c5;
+            --primary-light: #e8edff;
+            --success: #22c55e;
+            --success-bg: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-bg: #fffbeb;
+            --danger: #ef4444;
+            --danger-bg: #fef2f2;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.1);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 8px;
+            --font-mono: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-top: env(safe-area-inset-top, 0px);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            font-size: 16px;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom));
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px;
+            transition: var(--transition);
+        }
+
+        /* ===== 当前时间卡片 ===== */
+        .clock-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            color: #fff;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .clock-card .date-display {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .clock-card .date-text {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+        .clock-card .time-text {
+            font-size: 2.2rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+            line-height: 1.1;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+        .clock-card .clock-icon {
+            font-size: 2rem;
+            opacity: 0.7;
+            animation: subtlePulse 2s ease-in-out infinite;
+        }
+        @keyframes subtlePulse {
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+            50% {
+                opacity: 0.9;
+            }
+        }
+
+        /* ===== 当前作业卡片 ===== */
+        .current-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px 16px 16px;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 2px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+        .current-card.running {
+            border-color: var(--primary);
+        }
+        .current-card.paused {
+            border-color: var(--warning);
+        }
+        .current-card.overtime {
+            border-color: var(--danger);
+        }
+        .current-card.completed {
+            border-color: var(--success);
+        }
+        .current-card.empty {
+            border-color: var(--border);
+            text-align: center;
+            padding: 24px 16px;
+            color: var(--text-secondary);
+        }
+        .current-card.empty .empty-icon {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .current-card.empty .empty-text {
+            font-size: 1rem;
+        }
+
+        .current-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .current-label .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: none;
+        }
+        .badge-running {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+        .badge-paused {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+        .badge-overtime {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+        .badge-done {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .current-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+        .current-timer {
+            font-size: clamp(2.2rem, 10vw, 3.2rem);
+            font-weight: 800;
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+            line-height: 1.1;
+            margin-bottom: 6px;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.3s ease;
+        }
+        .current-timer.normal {
+            color: var(--primary);
+        }
+        .current-timer.warning {
+            color: var(--warning);
+        }
+        .current-timer.danger {
+            color: var(--danger);
+            animation: blinkDanger 1s ease-in-out infinite;
+        }
+        .current-timer.overtime {
+            color: var(--danger);
+            animation: blinkDanger 1s ease-in-out infinite;
+        }
+        .current-timer.paused-color {
+            color: var(--text-light);
+        }
+        .current-timer.completed-color {
+            color: var(--success);
+        }
+        @keyframes blinkDanger {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.55;
+            }
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.5s ease, background-color 0.3s ease;
+            background: var(--primary);
+        }
+        .progress-bar-fill.warning {
+            background: var(--warning);
+        }
+        .progress-bar-fill.danger {
+            background: var(--danger);
+        }
+        .progress-bar-fill.completed {
+            background: var(--success);
+        }
+        .progress-bar-fill.paused {
+            background: var(--text-light);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-row .btn {
+            flex: 1 1 calc(50% - 4px);
+            min-width: 0;
+        }
+        .btn {
+            flex: 1;
+            min-width: 0;
+            padding: 10px 14px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            letter-spacing: 0.3px;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            white-space: nowrap;
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+        .btn-warning {
+            background: var(--warning);
+            color: #fff;
+        }
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #16a34a;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ===== 预计完成时间卡片 ===== */
+        .eta-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .eta-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .eta-time {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
+        }
+        .eta-detail {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+        .eta-paused-note {
+            font-size: 0.7rem;
+            color: var(--warning);
+            font-weight: 600;
+            animation: subtleBlink 2s ease-in-out infinite;
+            width: 100%;
+            text-align: right;
+        }
+        @keyframes subtleBlink {
+            0%,
+            100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ===== 作业列表 ===== */
+        .list-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px;
+            flex-shrink: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .list-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .list-stats {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            background: var(--bg);
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+        .task-list {
+            list-style: none;
+            overflow-y: auto;
+            max-height: 220px;
+            flex-shrink: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
+        }
+        .task-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .task-list::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 999px;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1.5px solid transparent;
+            flex-shrink: 0;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .task-item:active {
+            transform: scale(0.98);
+        }
+        .task-item.current {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        .task-item.overtime {
+            border-color: var(--danger);
+            background: var(--danger-bg);
+        }
+        .task-item.completed {
+            opacity: 0.6;
+            background: var(--success-bg);
+            border-color: transparent;
+        }
+        .task-item.completed .task-name {
+            text-decoration: line-through;
+            color: var(--text-light);
+        }
+        .task-item.paused-item {
+            border-color: var(--warning);
+            background: var(--warning-bg);
+        }
+        .task-index {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-light);
+            min-width: 22px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .task-item.current .task-index {
+            color: var(--primary);
+        }
+        .task-item.overtime .task-index {
+            color: var(--danger);
+        }
+        .task-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .task-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-word;
+            line-height: 1.3;
+        }
+        .task-meta {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .task-meta.overtime {
+            color: var(--danger);
+            font-weight: 600;
+        }
+        .task-status {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+            flex-shrink: 0;
+            letter-spacing: 0.3px;
+        }
+        .status-current {
+            background: var(--primary);
+            color: #fff;
+        }
+        .status-done {
+            background: var(--success);
+            color: #fff;
+        }
+        .status-pending {
+            background: var(--border);
+            color: var(--text-secondary);
+        }
+        .status-skipped {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+        .status-overtime {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+        .task-delete {
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            color: var(--text-light);
+            transition: var(--transition);
+            flex-shrink: 0;
+            touch-action: manipulation;
+            line-height: 1;
+        }
+        .task-delete:hover {
+            color: var(--danger);
+            background: var(--danger-bg);
+        }
+        .task-delete:active {
+            transform: scale(0.9);
+        }
+
+        /* ===== 添加作业 ===== */
+        .add-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px;
+            flex-shrink: 0;
+        }
+        .add-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+        .format-hint {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            font-weight: 400;
+            margin-left: auto;
+            text-align: right;
+            line-height: 1.3;
+        }
+        .add-textarea {
+            width: 100%;
+            min-height: 70px;
+            max-height: 120px;
+            padding: 10px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-family: inherit;
+            resize: vertical;
+            transition: var(--transition);
+            background: var(--bg);
+            color: var(--text);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .add-textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.12);
+            background: #fff;
+        }
+        .add-textarea::placeholder {
+            color: var(--text-light);
+        }
+        .add-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== 响应式设计 ===== */
+        @media (orientation: portrait) {
+            .app {
+                gap: 10px;
+            }
+            .clock-card .time-text {
+                font-size: 2rem;
+            }
+            .current-timer {
+                font-size: clamp(2rem, 8vw, 2.8rem);
+            }
+            .task-list {
+                max-height: 180px;
+            }
+            .card {
+                padding: 12px;
+            }
+            .current-card {
+                padding: 14px 12px;
+            }
+        }
+
+        @media (orientation: landscape) {
+            .app {
+                max-width: 780px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .clock-card {
+                flex: 1 1 30%;
+                min-width: 180px;
+                flex-direction: column;
+                align-items: flex-start;
+                justify-content: center;
+                gap: 6px;
+                padding: 12px 16px;
+            }
+            .clock-card .time-text {
+                font-size: 1.8rem;
+            }
+            .clock-card .clock-icon {
+                position: absolute;
+                right: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 1.8rem;
+            }
+            .current-card {
+                flex: 1 1 38%;
+                min-width: 220px;
+                padding: 14px;
+            }
+            .eta-card {
+                flex: 1 1 25%;
+                min-width: 160px;
+                flex-direction: column;
+                align-items: flex-start;
+                justify-content: center;
+                gap: 4px;
+                padding: 12px 14px;
+            }
+            .list-card {
+                flex: 1 1 45%;
+                min-width: 240px;
+            }
+            .add-card {
+                flex: 1 1 45%;
+                min-width: 240px;
+            }
+            .task-list {
+                max-height: 160px;
+            }
+            .current-timer {
+                font-size: clamp(1.8rem, 5vw, 2.4rem);
+            }
+            .current-name {
+                font-size: 1.1rem;
+            }
+            .btn {
+                padding: 8px 10px;
+                font-size: 0.8rem;
+            }
+            .add-textarea {
+                min-height: 50px;
+                max-height: 80px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .clock-card .time-text {
+                font-size: 1.6rem;
+            }
+            .current-timer {
+                font-size: 1.8rem;
+            }
+            .current-name {
+                font-size: 1.1rem;
+            }
+            .btn {
+                font-size: 0.78rem;
+                padding: 8px 10px;
+            }
+            .card {
+                padding: 10px;
+                border-radius: 12px;
+            }
+            .task-item {
+                padding: 8px 10px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .app {
+                max-width: 560px;
+            }
+            .task-list {
+                max-height: 260px;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            .app {
+                gap: 6px;
+            }
+            .card {
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            .clock-card {
+                padding: 8px 12px;
+                border-radius: 10px;
+            }
+            .clock-card .time-text {
+                font-size: 1.3rem;
+            }
+            .clock-card .date-text {
+                font-size: 0.65rem;
+            }
+            .clock-card .clock-icon {
+                font-size: 1.2rem;
+            }
+            .current-card {
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            .current-timer {
+                font-size: 1.5rem;
+            }
+            .current-name {
+                font-size: 0.95rem;
+                margin-bottom: 4px;
+            }
+            .progress-bar-container {
+                height: 4px;
+                margin-bottom: 6px;
+            }
+            .progress-info {
+                font-size: 0.65rem;
+                margin-bottom: 4px;
+            }
+            .btn {
+                padding: 5px 8px;
+                font-size: 0.7rem;
+                border-radius: 6px;
+                gap: 3px;
+            }
+            .eta-card {
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            .eta-time {
+                font-size: 1rem;
+            }
+            .eta-label {
+                font-size: 0.7rem;
+            }
+            .list-card {
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            .task-list {
+                max-height: 100px;
+                gap: 3px;
+            }
+            .task-item {
+                padding: 5px 8px;
+                border-radius: 6px;
+                gap: 5px;
+            }
+            .task-name {
+                font-size: 0.75rem;
+            }
+            .task-meta {
+                font-size: 0.6rem;
+            }
+            .task-index {
+                font-size: 0.65rem;
+                min-width: 16px;
+            }
+            .task-status {
+                font-size: 0.55rem;
+                padding: 1px 5px;
+            }
+            .add-card {
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            .add-textarea {
+                min-height: 38px;
+                max-height: 55px;
+                font-size: 0.75rem;
+                padding: 6px 8px;
+            }
+            .add-header {
+                font-size: 0.75rem;
+                margin-bottom: 4px;
+            }
+            .format-hint {
+                font-size: 0.6rem;
+            }
+            .list-title {
+                font-size: 0.75rem;
+            }
+            .list-stats {
+                font-size: 0.6rem;
+                padding: 2px 6px;
+            }
+            .task-delete {
+                font-size: 0.9rem;
+                padding: 2px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app" id="app">
+        <!-- 当前时间卡片 -->
+        <div class="clock-card" id="clockCard">
+            <div class="date-display">
+                <span class="date-text" id="dateDisplay">----年--月--日 星期-</span>
+                <span class="time-text" id="timeDisplay">--:--:--</span>
+            </div>
+            <span class="clock-icon">🕐</span>
+        </div>
+
+        <!-- 当前作业卡片 -->
+        <div class="current-card empty" id="currentCard">
+            <div id="currentCardContent" style="display: none;">
+                <div class="current-label">
+                    <span id="currentBadge" class="badge badge-running">⏳ 进行中</span>
+                </div>
+                <div class="current-name" id="currentName">--</div>
+                <div class="current-timer normal" id="currentTimer">--:--:--</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressFill" style="width: 100%;"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressElapsed">已用 0:00</span>
+                    <span id="progressTotal">总计 0:00</span>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-warning" id="pauseBtn" title="暂停/继续">⏸️ 暂停</button>
+                    <button class="btn btn-success" id="completeBtn" title="标记为已完成">✅ 已完成</button>
+                    <button class="btn btn-secondary" id="skipBtn" title="跳过当前作业">⏭️ 跳过</button>
+                    <button class="btn btn-danger" id="resetCurrentBtn" title="重置当前作业">🔄 重置</button>
+                </div>
+            </div>
+            <div id="emptyState">
+                <span class="empty-icon">📋</span>
+                <span class="empty-text">暂无作业，请在下方添加</span>
+            </div>
+        </div>
+
+        <!-- 预计完成时间 -->
+        <div class="eta-card" id="etaCard">
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1;">
+                <span class="eta-label">🎯 预计全部完成</span>
+                <span class="eta-time" id="etaTime">--:--</span>
+                <span class="eta-detail" id="etaDetail">剩余 -- 小时 -- 分钟</span>
+            </div>
+            <span class="eta-paused-note" id="etaPausedNote" style="display:none;">⏸️ 暂停中，预计时间将推迟</span>
+        </div>
+
+        <!-- 作业列表 -->
+        <div class="list-card">
+            <div class="list-header">
+                <span class="list-title">📚 作业列表</span>
+                <span class="list-stats" id="listStats">0/0 完成</span>
+            </div>
+            <ul class="task-list" id="taskList"></ul>
+            <div style="text-align:center;padding:8px 0 2px;flex-shrink:0;">
+                <button class="btn btn-secondary" id="resetAllBtn" style="flex:0 0 auto;font-size:0.75rem;padding:6px 12px;">🗑️ 清空全部</button>
+            </div>
+        </div>
+
+        <!-- 添加作业 -->
+        <div class="add-card">
+            <div class="add-header">
+                ➕ 添加作业
+                <span class="format-hint">每行：名称 分钟数<br>如：数学作业 30</span>
+            </div>
+            <textarea class="add-textarea" id="addTextarea" placeholder="数学作业 30&#10;英语阅读 45&#10;物理习题 1:30" rows="3"></textarea>
+            <div class="add-actions">
+                <button class="btn btn-primary" id="addBtn">📥 一键添加</button>
+                <button class="btn btn-secondary" id="clearInputBtn">清空</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== 数据模型 ====================
+            const STORAGE_KEY = 'homework_timer_data_v3';
+
+            function defaultData() {
+                return {
+                    tasks: [],
+                    currentTaskId: null,
+                    isPaused: false,
+                    lastTickTime: Date.now(),
+                };
+            }
+
+            let data = loadData();
+            let tickInterval = null;
+            let uiUpdateInterval = null;
+
+            function loadData() {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && Array.isArray(parsed.tasks)) {
+                            parsed.tasks.forEach(t => {
+                                if (t.remainingSeconds === undefined) {
+                                    t.remainingSeconds = t.totalMinutes * 60;
+                                }
+                                if (t.status === undefined) {
+                                    t.status = 'pending';
+                                }
+                            });
+                            parsed.isPaused = parsed.isPaused || false;
+                            if (typeof parsed.lastTickTime !== 'number' || parsed.lastTickTime <= 0) {
+                                parsed.lastTickTime = Date.now();
+                            }
+                            return parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('加载数据失败:', e);
+                }
+                return defaultData();
+            }
+
+            function saveData() {
+                try {
+                    data.lastTickTime = Date.now();
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                } catch (e) {
+                    console.warn('保存数据失败:', e);
+                }
+            }
+
+            // ==================== 工具函数 ====================
+            function formatTime(seconds) {
+                if (seconds < 0) seconds = 0;
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = Math.floor(seconds % 60);
+                if (h > 0) {
+                    return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                }
+                return `${m}:${String(s).padStart(2,'0')}`;
+            }
+
+            function formatClockTime(date) {
+                const h = String(date.getHours()).padStart(2, '0');
+                const m = String(date.getMinutes()).padStart(2, '0');
+                const s = String(date.getSeconds()).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            }
+
+            function formatDateCN(date) {
+                const days = ['日', '一', '二', '三', '四', '五', '六'];
+                const y = date.getFullYear();
+                const m = date.getMonth() + 1;
+                const d = date.getDate();
+                const w = days[date.getDay()];
+                return `${y}年${m}月${d}日 星期${w}`;
+            }
+
+            function formatETATime(date) {
+                const h = String(date.getHours()).padStart(2, '0');
+                const m = String(date.getMinutes()).padStart(2, '0');
+                return `${h}:${m}`;
+            }
+
+            function parseTimeToMinutes(timeStr) {
+                timeStr = timeStr.trim();
+                if (!timeStr) return null;
+                if (timeStr.includes(':')) {
+                    const parts = timeStr.split(':');
+                    if (parts.length === 2) {
+                        const h = parseInt(parts[0], 10);
+                        const m = parseInt(parts[1], 10);
+                        if (!isNaN(h) && !isNaN(m) && h >= 0 && m >= 0 && m < 60) {
+                            return h * 60 + m;
+                        }
+                    }
+                    return null;
+                }
+                const num = parseFloat(timeStr);
+                if (!isNaN(num) && num > 0) {
+                    return num;
+                }
+                return null;
+            }
+
+            function generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+            }
+
+            // ==================== 核心逻辑 ====================
+            function getCurrentTask() {
+                if (!data.currentTaskId) return null;
+                return data.tasks.find(t => t.id === data.currentTaskId) || null;
+            }
+
+            function getNextPendingTask() {
+                return data.tasks.find(t => t.status === 'pending' && t.remainingSeconds > 0) || null;
+            }
+
+            function getTotalRemainingSeconds() {
+                let total = 0;
+                data.tasks.forEach(t => {
+                    if (t.status !== 'done' && t.remainingSeconds > 0) {
+                        total += t.remainingSeconds;
+                    }
+                });
+                return total;
+            }
+
+            function getCompletedCount() {
+                return data.tasks.filter(t => t.status === 'done').length;
+            }
+
+            function calculateETA() {
+                const totalRemaining = getTotalRemainingSeconds();
+                const now = Date.now();
+                const etaTimestamp = now + totalRemaining * 1000;
+                return new Date(etaTimestamp);
+            }
+
+            // 处理离线（页面关闭/后台）期间流逝的时间
+            function applyOfflineElapsed() {
+                const now = Date.now();
+                let elapsed = (now - data.lastTickTime) / 1000;
+
+                if (elapsed <= 0 || data.isPaused) {
+                    data.lastTickTime = now;
+                    return;
+                }
+
+                let current = getCurrentTask();
+                if (current && current.status !== 'done') {
+                    // 当前任务持续计时（允许负数，即超时）
+                    current.remainingSeconds -= elapsed;
+                } else {
+                    // 没有当前任务，尝试启动第一个
+                    const next = getNextPendingTask();
+                    if (next) {
+                        data.currentTaskId = next.id;
+                        next.status = 'running';
+                        next.remainingSeconds -= elapsed;
+                    }
+                }
+
+                data.lastTickTime = now;
+            }
+
+            function switchToTask(taskId) {
+                const current = getCurrentTask();
+                if (current && (current.status === 'running' || current.status === 'paused')) {
+                    current.status = 'pending';
+                }
+
+                if (taskId === null) {
+                    data.currentTaskId = null;
+                    data.isPaused = false;
+                    saveData();
+                    updateUI();
+                    return;
+                }
+
+                const task = data.tasks.find(t => t.id === taskId);
+                if (!task || task.status === 'done') return;
+
+                data.currentTaskId = taskId;
+                data.isPaused = false;
+                task.status = 'running';
+                data.lastTickTime = Date.now();
+                saveData();
+                updateUI();
+            }
+
+            function pauseCurrentTask() {
+                const current = getCurrentTask();
+                if (!current || current.status === 'done') return;
+                data.isPaused = !data.isPaused;
+                if (data.isPaused) {
+                    current.status = 'paused';
+                } else {
+                    current.status = 'running';
+                    data.lastTickTime = Date.now();
+                }
+                saveData();
+                updateUI();
+            }
+
+            // ★ 新增：标记当前作业为已完成（支持提前完成）
+            function completeCurrentTask() {
+                const current = getCurrentTask();
+                if (!current) return;
+
+                // 标记完成，剩余时间清零
+                current.remainingSeconds = 0;
+                current.status = 'done';
+                playCompletionSound();
+
+                // 自动切换到下一个待做任务
+                const next = getNextPendingTask();
+                if (next) {
+                    switchToTask(next.id);
+                } else {
+                    data.currentTaskId = null;
+                    data.isPaused = false;
+                    saveData();
+                    updateUI();
+                }
+            }
+
+            function skipCurrentTask() {
+                const current = getCurrentTask();
+                if (!current) return;
+                current.status = 'skipped';
+                const next = getNextPendingTask();
+                if (next) {
+                    switchToTask(next.id);
+                } else {
+                    data.currentTaskId = null;
+                    data.isPaused = false;
+                    saveData();
+                    updateUI();
+                }
+            }
+
+            function resetCurrentTask() {
+                const current = getCurrentTask();
+                if (!current) return;
+                current.remainingSeconds = current.totalMinutes * 60;
+                current.status = 'running';
+                data.isPaused = false;
+                data.lastTickTime = Date.now();
+                saveData();
+                updateUI();
+            }
+
+            function resetAllTasks() {
+                if (data.tasks.length === 0) return;
+                if (!confirm('确定要清空所有作业吗？')) return;
+                data.tasks = [];
+                data.currentTaskId = null;
+                data.isPaused = false;
+                saveData();
+                updateUI();
+            }
+
+            function addTasksFromText(text) {
+                const lines = text.split('\n').filter(line => line.trim());
+                const addedTasks = [];
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    let name = '';
+                    let timeStr = '';
+                    const tabSplit = trimmed.split('\t');
+                    if (tabSplit.length >= 2) {
+                        name = tabSplit[0].trim();
+                        timeStr = tabSplit.slice(1).join(' ').trim();
+                    } else {
+                        const pipeSplit = trimmed.split('|');
+                        if (pipeSplit.length >= 2) {
+                            name = pipeSplit[0].trim();
+                            timeStr = pipeSplit.slice(1).join(' ').trim();
+                        } else {
+                            const lastSpaceIdx = trimmed.lastIndexOf(' ');
+                            if (lastSpaceIdx > 0) {
+                                name = trimmed.substring(0, lastSpaceIdx).trim();
+                                timeStr = trimmed.substring(lastSpaceIdx + 1).trim();
+                            } else {
+                                const commaSplit = trimmed.split(/[,，]/);
+                                if (commaSplit.length >= 2) {
+                                    name = commaSplit[0].trim();
+                                    timeStr = commaSplit.slice(1).join(' ').trim();
+                                }
+                            }
+                        }
+                    }
+                    if (!name || !timeStr) continue;
+                    const minutes = parseTimeToMinutes(timeStr);
+                    if (minutes !== null && minutes > 0) {
+                        const task = {
+                            id: generateId(),
+                            name: name,
+                            totalMinutes: minutes,
+                            remainingSeconds: Math.round(minutes * 60),
+                            status: 'pending',
+                        };
+                        data.tasks.push(task);
+                        addedTasks.push(task);
+                    }
+                }
+                if (addedTasks.length > 0) {
+                    const current = getCurrentTask();
+                    if (!current || current.status === 'done') {
+                        const firstPending = getNextPendingTask();
+                        if (firstPending) {
+                            switchToTask(firstPending.id);
+                        }
+                    }
+                    saveData();
+                    updateUI();
+                    return true;
+                }
+                return false;
+            }
+
+            function deleteTask(taskId) {
+                const wasCurrent = data.currentTaskId === taskId;
+                data.tasks = data.tasks.filter(t => t.id !== taskId);
+                if (wasCurrent) {
+                    data.currentTaskId = null;
+                    data.isPaused = false;
+                    const next = getNextPendingTask();
+                    if (next) {
+                        switchToTask(next.id);
+                    } else {
+                        updateUI();
+                    }
+                } else {
+                    saveData();
+                    updateUI();
+                }
+            }
+
+            function manualSwitchTask(taskId) {
+                const task = data.tasks.find(t => t.id === taskId);
+                if (!task) return;
+                if (task.status === 'done') return;
+                if (taskId === data.currentTaskId) return;
+                if (task.status === 'skipped') {
+                    if (task.remainingSeconds > 0) {
+                        task.status = 'pending';
+                    } else {
+                        return;
+                    }
+                }
+                switchToTask(taskId);
+            }
+
+            // ==================== 计时更新 ====================
+            // ★ 核心改动：到时不自动完成，持续计时（允许负数表示超时）
+            function tick() {
+                const now = Date.now();
+                const dt = (now - data.lastTickTime) / 1000;
+                data.lastTickTime = now;
+
+                const current = getCurrentTask();
+                if (current && !data.isPaused && current.status !== 'done') {
+                    current.remainingSeconds -= dt;
+                }
+
+                if (Math.floor(now / 5000) !== Math.floor((now - dt * 1000) / 5000)) {
+                    saveData();
+                }
+                updateUI();
+            }
+
+            function playCompletionSound() {
+                try {
+                    const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                    oscillator.frequency.setValueAtTime(660, audioCtx.currentTime + 0.15);
+                    oscillator.frequency.setValueAtTime(990, audioCtx.currentTime + 0.3);
+                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                    oscillator.start(audioCtx.currentTime);
+                    oscillator.stop(audioCtx.currentTime + 0.5);
+                } catch (e) {}
+            }
+
+            // ==================== UI渲染 ====================
+            function updateUI() {
+                updateClock();
+                updateCurrentCard();
+                updateETA();
+                updateTaskList();
+                updateButtons();
+            }
+
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('timeDisplay').textContent = formatClockTime(now);
+                document.getElementById('dateDisplay').textContent = formatDateCN(now);
+            }
+
+            function updateCurrentCard() {
+                const card = document.getElementById('currentCard');
+                const content = document.getElementById('currentCardContent');
+                const emptyState = document.getElementById('emptyState');
+                const current = getCurrentTask();
+                const hasActiveTask = data.tasks.some(t =>
+                    t.status === 'pending' || t.status === 'running' || t.status === 'paused'
+                );
+                const allDone = data.tasks.length > 0 && !hasActiveTask;
+
+                if (allDone) {
+                    card.className = 'current-card completed';
+                    content.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    emptyState.innerHTML = `
+                        <span class="empty-icon">🎉</span>
+                        <span class="empty-text" style="font-size:1.1rem;font-weight:700;">全部完成！</span>
+                        <span class="empty-text" style="font-size:0.8rem;color:var(--text-secondary);">太棒了！你完成了所有作业</span>
+                    `;
+                    return;
+                }
+
+                if (!current) {
+                    card.className = 'current-card empty';
+                    content.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    emptyState.innerHTML = `
+                        <span class="empty-icon">📋</span>
+                        <span class="empty-text">${data.tasks.length === 0 ? '暂无作业，请在下方添加' : '没有正在进行的作业'}</span>
+                    `;
+                    return;
+                }
+
+                const remaining = current.remainingSeconds;
+                const isOvertime = remaining < 0 && !data.isPaused;
+
+                if (isOvertime) {
+                    card.className = 'current-card overtime';
+                } else if (data.isPaused) {
+                    card.className = 'current-card paused';
+                } else {
+                    card.className = 'current-card running';
+                }
+                content.style.display = 'block';
+                emptyState.style.display = 'none';
+
+                document.getElementById('currentName').textContent = current.name;
+
+                const timerEl = document.getElementById('currentTimer');
+                timerEl.className = 'current-timer';
+                if (data.isPaused) {
+                    timerEl.textContent = formatTime(Math.max(0, remaining));
+                    timerEl.classList.add('paused-color');
+                } else if (remaining < 0) {
+                    timerEl.textContent = `超时 +${formatTime(-remaining)}`;
+                    timerEl.classList.add('overtime');
+                } else {
+                    timerEl.textContent = formatTime(remaining);
+                    if (remaining <= 60) {
+                        timerEl.classList.add('danger');
+                    } else if (remaining <= 300) {
+                        timerEl.classList.add('warning');
+                    } else {
+                        timerEl.classList.add('normal');
+                    }
+                }
+
+                const badge = document.getElementById('currentBadge');
+                if (data.isPaused) {
+                    badge.textContent = '⏸️ 已暂停';
+                    badge.className = 'badge badge-paused';
+                } else if (isOvertime) {
+                    badge.textContent = '⚠️ 超时中';
+                    badge.className = 'badge badge-overtime';
+                } else {
+                    badge.textContent = '⏳ 进行中';
+                    badge.className = 'badge badge-running';
+                }
+
+                const totalSeconds = current.totalMinutes * 60;
+                const elapsed = Math.max(0, totalSeconds - remaining);
+                const progress = totalSeconds > 0 ? (elapsed / totalSeconds) * 100 : 0;
+                const fill = document.getElementById('progressFill');
+                fill.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+                fill.className = 'progress-bar-fill';
+                if (data.isPaused) {
+                    fill.classList.add('paused');
+                } else if (remaining < 0 || remaining <= 60) {
+                    fill.classList.add('danger');
+                } else if (remaining <= 300) {
+                    fill.classList.add('warning');
+                } else {
+                    fill.classList.add('normal');
+                }
+
+                document.getElementById('progressElapsed').textContent = `已用 ${formatTime(elapsed)}`;
+                document.getElementById('progressTotal').textContent = `总计 ${formatTime(totalSeconds)}`;
+
+                document.getElementById('pauseBtn').textContent = data.isPaused ? '▶️ 继续' : '⏸️ 暂停';
+                document.getElementById('pauseBtn').className = data.isPaused ? 'btn btn-success' : 'btn btn-warning';
+            }
+
+            function updateETA() {
+                const eta = calculateETA();
+                const totalRemaining = getTotalRemainingSeconds();
+                const etaTimeEl = document.getElementById('etaTime');
+                const etaDetailEl = document.getElementById('etaDetail');
+                const etaPausedNote = document.getElementById('etaPausedNote');
+
+                if (data.tasks.length === 0) {
+                    etaTimeEl.textContent = '--:--';
+                    etaDetailEl.textContent = '暂无作业';
+                    etaPausedNote.style.display = 'none';
+                    return;
+                }
+
+                if (totalRemaining <= 0) {
+                    const current = getCurrentTask();
+                    if (current && current.remainingSeconds < 0) {
+                        etaTimeEl.textContent = '⚠️ 超时中';
+                        etaDetailEl.textContent = `已超时 ${formatTime(-current.remainingSeconds)}，请尽快完成`;
+                    } else {
+                        etaTimeEl.textContent = '已完成 🎉';
+                        etaDetailEl.textContent = '所有作业已完成';
+                    }
+                    etaPausedNote.style.display = 'none';
+                    return;
+                }
+
+                etaTimeEl.textContent = formatETATime(eta);
+                const hours = Math.floor(totalRemaining / 3600);
+                const minutes = Math.floor((totalRemaining % 3600) / 60);
+                let detail = '';
+                if (hours > 0) {
+                    detail = `剩余 ${hours} 小时 ${minutes} 分钟`;
+                } else {
+                    detail = `剩余 ${minutes} 分钟`;
+                }
+                etaDetailEl.textContent = detail;
+
+                if (data.isPaused && getCurrentTask()) {
+                    etaPausedNote.style.display = 'block';
+                } else {
+                    etaPausedNote.style.display = 'none';
+                }
+            }
+
+            function updateTaskList() {
+                const listEl = document.getElementById('taskList');
+                const statsEl = document.getElementById('listStats');
+                const completed = getCompletedCount();
+                const total = data.tasks.length;
+                statsEl.textContent = `${completed}/${total} 完成`;
+
+                if (data.tasks.length === 0) {
+                    listEl.innerHTML =
+                        '<li style="text-align:center;color:var(--text-light);padding:16px;font-size:0.85rem;">📭 暂无作业，请添加</li>';
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                data.tasks.forEach((task, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'task-item';
+
+                    const isCurrent = task.id === data.currentTaskId;
+                    const isDone = task.status === 'done';
+                    const isSkipped = task.status === 'skipped' && task.remainingSeconds > 0;
+                    const isOvertime = isCurrent && !data.isPaused && task.remainingSeconds < 0;
+
+                    if (isCurrent && !isOvertime) {
+                        li.classList.add('current');
+                        if (data.isPaused) li.classList.add('paused-item');
+                    }
+                    if (isOvertime) {
+                        li.classList.add('overtime');
+                    }
+                    if (isDone) {
+                        li.classList.add('completed');
+                    }
+
+                    let statusClass, statusText;
+                    if (isDone) {
+                        statusClass = 'status-done';
+                        statusText = '✅ 完成';
+                    } else if (isOvertime) {
+                        statusClass = 'status-overtime';
+                        statusText = '⚠️ 超时';
+                    } else if (isCurrent) {
+                        statusClass = data.isPaused ? 'status-skipped' : 'status-current';
+                        statusText = data.isPaused ? '⏸️ 暂停' : '▶️ 进行中';
+                    } else if (isSkipped) {
+                        statusClass = 'status-skipped';
+                        statusText = '⏭️ 跳过';
+                    } else {
+                        statusClass = 'status-pending';
+                        statusText = '⏳ 待做';
+                    }
+
+                    let displayRemaining;
+                    if (isDone) {
+                        displayRemaining = '已完成';
+                    } else if (task.remainingSeconds < 0) {
+                        displayRemaining = `超时 +${formatTime(-task.remainingSeconds)}`;
+                    } else {
+                        displayRemaining = `剩余 ${formatTime(task.remainingSeconds)}`;
+                    }
+
+                    li.innerHTML = `
+                        <span class="task-index">${index + 1}</span>
+                        <div class="task-info">
+                            <span class="task-name">${escapeHtml(task.name)}</span>
+                            <span class="task-meta ${task.remainingSeconds < 0 && !isDone ? 'overtime' : ''}">
+                                <span>${formatTime(task.totalMinutes * 60)}</span>
+                                <span>·</span>
+                                <span>${displayRemaining}</span>
+                            </span>
+                        </div>
+                        <span class="task-status ${statusClass}">${statusText}</span>
+                        <button class="task-delete" data-id="${task.id}" title="删除">✕</button>
+                    `;
+
+                    li.addEventListener('click', (e) => {
+                        if (e.target.closest('.task-delete')) return;
+                        manualSwitchTask(task.id);
+                    });
+
+                    const deleteBtn = li.querySelector('.task-delete');
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteTask(task.id);
+                    });
+
+                    listEl.appendChild(li);
+                });
+            }
+
+            function updateButtons() {
+                const current = getCurrentTask();
+                const pauseBtn = document.getElementById('pauseBtn');
+                const completeBtn = document.getElementById('completeBtn');
+                const skipBtn = document.getElementById('skipBtn');
+                const resetCurrentBtn = document.getElementById('resetCurrentBtn');
+
+                const enabled = !!current;
+                pauseBtn.disabled = !enabled;
+                completeBtn.disabled = !enabled;
+                skipBtn.disabled = !enabled;
+                resetCurrentBtn.disabled = !enabled;
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ==================== 事件绑定 ====================
+            function bindEvents() {
+                document.getElementById('pauseBtn').addEventListener('click', pauseCurrentTask);
+                document.getElementById('completeBtn').addEventListener('click', completeCurrentTask);
+                document.getElementById('skipBtn').addEventListener('click', skipCurrentTask);
+                document.getElementById('resetCurrentBtn').addEventListener('click', resetCurrentTask);
+                document.getElementById('resetAllBtn').addEventListener('click', resetAllTasks);
+
+                document.getElementById('addBtn').addEventListener('click', () => {
+                    const textarea = document.getElementById('addTextarea');
+                    const text = textarea.value.trim();
+                    if (!text) return;
+                    const success = addTasksFromText(text);
+                    if (success) {
+                        textarea.value = '';
+                        const btn = document.getElementById('addBtn');
+                        btn.textContent = '✅ 已添加';
+                        setTimeout(() => {
+                            btn.textContent = '📥 一键添加';
+                        }, 1200);
+                    } else {
+                        alert('格式解析失败，请检查格式。\n每行：作业名称 分钟数\n例如：数学作业 30');
+                    }
+                });
+
+                document.getElementById('clearInputBtn').addEventListener('click', () => {
+                    document.getElementById('addTextarea').value = '';
+                });
+
+                document.getElementById('addTextarea').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        document.getElementById('addBtn').click();
+                    }
+                });
+
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        applyOfflineElapsed();
+                        updateUI();
+                    }
+                });
+
+                window.addEventListener('beforeunload', saveData);
+                window.addEventListener('pagehide', saveData);
+            }
+
+            // ==================== 启动 ====================
+            function init() {
+                bindEvents();
+
+                // 处理页面关闭期间流逝的时间
+                applyOfflineElapsed();
+
+                // 校验当前任务
+                let current = getCurrentTask();
+                if (current && current.status === 'done') {
+                    data.currentTaskId = null;
+                    current = null;
+                }
+
+                if (current && !data.isPaused && current.status !== 'running') {
+                    current.status = 'running';
+                }
+                if (current && data.isPaused && current.status !== 'paused') {
+                    current.status = 'paused';
+                }
+
+                // 没有当前任务时，自动启动第一个待做任务
+                if (!current) {
+                    const next = getNextPendingTask();
+                    if (next) {
+                        switchToTask(next.id);
+                    }
+                }
+
+                saveData();
+                updateUI();
+
+                tickInterval = setInterval(tick, 1000);
+                uiUpdateInterval = setInterval(updateClock, 250);
+            }
+
+            window.addEventListener('beforeunload', () => {
+                if (tickInterval) clearInterval(tickInterval);
+                if (uiUpdateInterval) clearInterval(uiUpdateInterval);
+                saveData();
+            });
+
+            init();
+
+            window.__homeworkTimer = {
+                data,
+                addTasksFromText,
+                switchToTask,
+                pauseCurrentTask,
+                completeCurrentTask,
+                skipCurrentTask,
+                resetCurrentTask,
+                resetAllTasks,
+                deleteTask,
+                updateUI,
+            };
+
+            console.log('📚 作业计时器已启动！');
+            console.log('格式示例：每行"名称 分钟数"，如"数学作业 30"');
+            console.log('支持 HH:MM 格式，如"物理习题 1:30"');
+            console.log('倒计时结束不会自动完成，点击"✅ 已完成"按钮才标记完成。');
+        })();
+    </script>
+</body>
+</html>
